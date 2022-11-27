@@ -7,6 +7,7 @@
       "test": "echo \"Error: no test specified\" && exit 1",
       "typeorm": "typeorm-ts-node-commonjs",
       "start": "ts-node src/index.ts",
+      "migrate":"typeorm-ts-node-commonjs migration:run -d build/data-source",
       "dev": "concurrently \"npx tsc --watch\" \"nodemon -q build/index.js\""
    },
    "author": "",
