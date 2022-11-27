@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../data-source';
 import { Booking } from '../entity/Booking';
 import { Event } from '../entity/Event';
@@ -9,7 +9,7 @@ const BOOKING_STATUS = {
   COMPLETED: 'COMPLETED',
 };
 
-export const getSchedule = async (req: Request, res: Response) => {
+export const getSchedule = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const events = await AppDataSource.getRepository(Event)
       .createQueryBuilder('event')
@@ -36,11 +36,11 @@ export const getSchedule = async (req: Request, res: Response) => {
     const result = { events, bookings };
     return res.status(200).json(result);
   } catch (err) {
-    console.log(err);
+    next(err);
   }
 };
 
-export const postSchedule = async (req: Request, res: Response) => {
+export const postSchedule = async (req: Request, res: Response, next: NextFunction) => {
   try {
     //* All the previous bookings from 'current date time' will be updated to 'COMPLETED' to reduce the clutter
     await AppDataSource.createQueryBuilder()
@@ -66,7 +66,7 @@ export const postSchedule = async (req: Request, res: Response) => {
       .execute();
     return res.status(201).json({ message: 'Appointment Scheduled' });
   } catch (err) {
-    console.log(err);
+    next(err);
   }
 };
 
