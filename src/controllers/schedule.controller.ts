@@ -3,6 +3,7 @@ import { Request, Response, NextFunction } from 'express';
 import { AppDataSource } from '../data-source';
 import { Booking } from '../entity/Booking';
 import { Event } from '../entity/Event';
+import { validatePostScheduleRequest } from '../utils/helpers';
 
 const BOOKING_STATUS = {
   PENDING: 'PENDING',
@@ -42,6 +43,9 @@ export const getSchedule = async (req: Request, res: Response, next: NextFunctio
 
 export const postSchedule = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { email, firstName, lastName, eventId, startTime } = req?.body;
+    validatePostScheduleRequest();
+
     //* All the previous bookings from 'current date time' will be updated to 'COMPLETED' to reduce the clutter
     await AppDataSource.createQueryBuilder()
       .update(Booking)
@@ -49,7 +53,6 @@ export const postSchedule = async (req: Request, res: Response, next: NextFuncti
       .where('Booking.startTime < :currentTime', { currentTime: new Date() })
       .execute();
 
-    const { email, firstName, lastName, eventId, startTime } = req?.body;
     await AppDataSource.createQueryBuilder()
       .insert()
       .into(Booking)
