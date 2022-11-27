@@ -4,6 +4,11 @@ import { AppDataSource } from '../data-source';
 import { Booking } from '../entity/Booking';
 import { Event } from '../entity/Event';
 
+const BOOKING_STATUS = {
+  PENDING: 'PENDING',
+  COMPLETED: 'COMPLETED',
+};
+
 export const getSchedule = async (req: Request, res: Response) => {
   try {
     const events = await AppDataSource.getRepository(Event)
@@ -13,7 +18,7 @@ export const getSchedule = async (req: Request, res: Response) => {
     const bookingData = await AppDataSource.getRepository(Booking)
       .createQueryBuilder('booking')
       .leftJoinAndSelect('booking.event', 'event')
-      .where('booking.status = :status', { status: 'PENDING' })
+      .where('booking.status = :status', { status: BOOKING_STATUS.PENDING })
       .getMany();
     const bookings = {};
     if (bookingData?.length) {
@@ -37,6 +42,13 @@ export const getSchedule = async (req: Request, res: Response) => {
 
 export const postSchedule = async (req: Request, res: Response) => {
   try {
+    //* All the previous bookings from 'current date time' will be updated to 'COMPLETED' to reduce the clutter
+    await AppDataSource.createQueryBuilder()
+      .update(Booking)
+      .set({ status: BOOKING_STATUS.COMPLETED })
+      .where('Booking.startTime < :currentTime', { currentTime: new Date() })
+      .execute();
+
     const { email, firstName, lastName, eventId, startTime } = req?.body;
     await AppDataSource.createQueryBuilder()
       .insert()
@@ -46,7 +58,7 @@ export const postSchedule = async (req: Request, res: Response) => {
           email,
           firstName,
           lastName,
-          status: 'PENDING',
+          status: BOOKING_STATUS.PENDING,
           startTime: format(new Date(startTime), 'y-MM-dd HH:mm:ss'),
           event: () => eventId,
         },
