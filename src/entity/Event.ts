@@ -1,4 +1,5 @@
 import { Column, Entity, PrimaryGeneratedColumn, OneToMany, JoinColumn } from 'typeorm';
+import { Config } from './Config';
 
 @Entity()
 export class Event {
@@ -24,4 +25,7 @@ export class Event {
 
   @Column()
   cleanUpBreak: number;
+
+  @OneToMany(() => Config, (config) => config.event)
+  config: Config[];
 }
