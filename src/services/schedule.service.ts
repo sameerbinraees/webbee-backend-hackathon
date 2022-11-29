@@ -1,4 +1,4 @@
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 
 import { AppDataSource } from '../data-source';
 import { Booking } from '../entity/Booking';
@@ -68,7 +68,7 @@ export const addBooking = async (args) => {
 };
 
 export const validatePostScheduleRequest = async (eventId, bookingTime) => {
-  // shop is open and not in any break:
+  // Shop is open:
   const day = new Date(bookingTime).getDay();
   if (day === 7) throw new ErrorHandler('BAD_REQUEST', 'Shop is closed at the requested time', 400);
 
@@ -79,12 +79,26 @@ export const validatePostScheduleRequest = async (eventId, bookingTime) => {
     .getMany();
   console.log(config);
   const requestTimeInMilliseconds = new Date(bookingTime).getTime();
-  const requestHour = new Date(bookingTime).getHours();
-  const openingHour = new Date(config?.openingTime).getHours();
-  const closingHour = new Date(config?.closingTime).getHours();
-  if (requestHour < openingHour || requestHour > closingHour)
+  const openingTime = new Date(
+    new Date(bookingTime).getFullYear(),
+    new Date(bookingTime).getMonth(),
+    new Date(bookingTime).getDate(),
+    new Date(config?.openingTime).getHours(),
+    new Date(config?.openingTime).getMinutes(),
+    new Date(config?.openingTime).getSeconds(),
+  ).getTime();
+  const closingTime = new Date(
+    new Date(bookingTime).getFullYear(),
+    new Date(bookingTime).getMonth(),
+    new Date(bookingTime).getDate(),
+    new Date(config?.closingTime).getHours(),
+    new Date(config?.closingTime).getMinutes(),
+    new Date(config?.closingTime).getSeconds(),
+  ).getTime();
+  if (requestTimeInMilliseconds <= openingTime || requestTimeInMilliseconds > closingTime)
     throw new ErrorHandler('BAD_REQUEST', 'Shop is closed at the requested time', 400);
-  // not between any work breaks
+
+  // Not between any work breaks:
   config?.workBreaks?.forEach((breakTime) => {
     const [breakStart, breakEnd] = breakTime.split(' -- ');
     const breakStartInMilliseconds = new Date(
@@ -114,16 +128,48 @@ export const validatePostScheduleRequest = async (eventId, bookingTime) => {
       );
   });
 
-  // Not in any booked time
+  // Not in any booked time:
   const bookingData = await getBookings(BOOKING_STATUS.PENDING);
   const bookings = transformBookingDetails(bookingData);
   const requestDate = format(new Date(bookingTime), 'y-MM-dd');
-  const requestTime = format(new Date(bookingTime), 'HH:mm');
-  const alreadyBookedSlots = bookings?.[requestDate]?.[requestTime][`event_${eventId}`] || 0;
+  const formattedRequestTime = format(new Date(bookingTime), 'HH:mm');
+  const alreadyBookedSlots =
+    bookings?.[requestDate]?.[formattedRequestTime][`event_${eventId}`] || 0;
   if (config?.totalClientsPerSlot - alreadyBookedSlots >= 0)
     throw new ErrorHandler(
       'BAD_REQUEST',
       'All slots are already booked at the requested time',
       400,
     );
+
+  // Slots available:
+  const event = await AppDataSource.getRepository(Event)
+    .createQueryBuilder('event')
+    .where('event."id" = :eventId', { eventId })
+    .getOne();
+
+  // Public holidays
+  event?.holidayDates?.forEach((holidayDate) => {
+    const date = format(new Date(holidayDate), 'y-MM-dd');
+    if (requestDate === date)
+      throw new ErrorHandler('BAD_REQUEST', 'There is a public holiday at the requested time', 400);
+  });
+
+  const advanceDays = differenceInDays(new Date(), bookingTime);
+  if (advanceDays > event.advanceBookingDays)
+    throw new ErrorHandler(
+      'BAD_REQUEST',
+      `You cannot book an advance date more than ${event.advanceBookingDays} days`,
+      400,
+    );
+  //   let time = 0
+  //   const slotsInMinutes = []
+  //   while (time >= 0) {
+  //     slotsInMinutes.push(time)
+  //     time+=event?.duration
+  // }
+  // Slots timing:
+  // openingHour
+  // closingHour
+  // event
 };
