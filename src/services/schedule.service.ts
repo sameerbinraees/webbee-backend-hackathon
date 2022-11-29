@@ -1,4 +1,4 @@
-import { format, differenceInDays } from 'date-fns';
+import { format, addMinutes, differenceInDays } from 'date-fns';
 
 import { AppDataSource } from '../data-source';
 import { Booking } from '../entity/Booking';
@@ -77,7 +77,6 @@ export const validatePostScheduleRequest = async (eventId, bookingTime) => {
     .where('config."eventId" = :eventId', { eventId })
     .andWhere('config."dayOfWeek" = :dayOfWeek', { dayOfWeek: `${day}` })
     .getMany();
-  console.log(config);
   const requestTimeInMilliseconds = new Date(bookingTime).getTime();
   const openingTime = new Date(
     new Date(bookingTime).getFullYear(),
@@ -135,7 +134,7 @@ export const validatePostScheduleRequest = async (eventId, bookingTime) => {
   const formattedRequestTime = format(new Date(bookingTime), 'HH:mm');
   const alreadyBookedSlots =
     bookings?.[requestDate]?.[formattedRequestTime][`event_${eventId}`] || 0;
-  if (config?.totalClientsPerSlot - alreadyBookedSlots >= 0)
+  if (config?.totalClientsPerSlot - alreadyBookedSlots <= 0)
     throw new ErrorHandler(
       'BAD_REQUEST',
       'All slots are already booked at the requested time',
@@ -150,26 +149,35 @@ export const validatePostScheduleRequest = async (eventId, bookingTime) => {
 
   // Public holidays
   event?.holidayDates?.forEach((holidayDate) => {
-    const date = format(new Date(holidayDate), 'y-MM-dd');
+    const date = format(new Date(holidayDate).getTime(), 'y-MM-dd');
     if (requestDate === date)
       throw new ErrorHandler('BAD_REQUEST', 'There is a public holiday at the requested time', 400);
   });
 
-  const advanceDays = differenceInDays(new Date(), bookingTime);
+  const advanceDays = differenceInDays(new Date(bookingTime), new Date());
   if (advanceDays > event.advanceBookingDays)
     throw new ErrorHandler(
       'BAD_REQUEST',
       `You cannot book an advance date more than ${event.advanceBookingDays} days`,
       400,
     );
-  //   let time = 0
-  //   const slotsInMinutes = []
-  //   while (time >= 0) {
-  //     slotsInMinutes.push(time)
-  //     time+=event?.duration
-  // }
+
   // Slots timing:
-  // openingHour
-  // closingHour
-  // event
+  let time = openingTime;
+  const slots = [];
+  while (!(closingTime <= time)) {
+    slots.push(
+      `${new Date(
+        new Date(time).getFullYear(),
+        new Date(time).getMonth(),
+        new Date(time).getDate(),
+        new Date(time).getHours(),
+        new Date(time).getMinutes(),
+        new Date(time).getSeconds(),
+      ).toISOString()}`,
+    );
+    time += (event?.duration + event?.cleanUpBreak) * 60 * 1000;
+  }
+  if (!slots.includes(bookingTime))
+    throw new ErrorHandler('BAD_REQUEST', `Invalid slot selected`, 400);
 };
