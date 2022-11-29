@@ -1,6 +1,7 @@
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import scheduleRouter from './routes/schedule.route';
+import { handleError } from './utils/error';
 
 const app: Express = express();
 const port = process.env.PORT || 3000;
@@ -15,15 +16,7 @@ app.get('/health', (req: Request, res: Response) => {
 app.use('/schedule', scheduleRouter);
 
 app.use((err, req, res, next) => {
-  console.error(err);
-  const code = err?.code || 500;
-  const name = err?.name || 'Something went wrong';
-  const message = err?.message || 'Request failed';
-  res.status(code).json({
-    statusCode: code,
-    name,
-    message,
-  });
+  handleError(err, res);
 });
 
 app.listen(port, () => {
